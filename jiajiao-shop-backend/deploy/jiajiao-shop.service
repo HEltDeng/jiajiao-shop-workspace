@@ -1,0 +1,29 @@
+[Unit]
+Description=Jiajiao Shop sandbox API
+After=network.target
+
+[Service]
+Type=simple
+User=jiajiao
+Group=jiajiao
+WorkingDirectory=/opt/jiajiao-shop/current/jiajiao-shop-backend
+Environment=APP_MODE=sandbox
+Environment=DATABASE_PATH=/var/lib/jiajiao-shop/sandbox.sqlite3
+Environment=FRONTEND_PATH=/opt/jiajiao-shop/current/jiajiao-shop-frontend
+Environment=COOKIE_SECURE=true
+Environment=ALLOWED_HOSTS=jiajiao.mychangliapp.cn,jiajiao-admin.mychangliapp.cn,127.0.0.1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/jiajiao-shop/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8796 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-access-log
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/jiajiao-shop
+MemoryMax=384M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
