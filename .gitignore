@@ -5,3 +5,5 @@ artifacts/
 **/.pytest_cache/
 **/.env
 .DS_Store
+图片素材/界面验收/
+交付成品/部署包/
