@@ -1,0 +1,6 @@
+[submodule "jiajiao-shop-backend"]
+	path = jiajiao-shop-backend
+	url = https://github.com/HEltDeng/jiajiao-shop-backend.git
+[submodule "jiajiao-shop-frontend"]
+	path = jiajiao-shop-frontend
+	url = https://github.com/HEltDeng/jiajiao-shop-frontend.git
