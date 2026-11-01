@@ -99,6 +99,37 @@ def test_csrf_origin_and_permissions(client):
     assert client.get('/robots.txt').text=='User-agent: *\nDisallow: /\n'
 
 
+@pytest.mark.parametrize('length', [None, '1'])
+def test_body_limit_counts_streamed_bytes(client, length):
+    headers = {'Content-Type': 'application/json'}
+    if length is not None:
+        headers['Content-Length'] = length
+    response = client.post('/api/demo/role', headers=headers,
+                           content=iter([b'{"role":"customer"}', b' ' * 16000]))
+    assert response.status_code == 413
+
+
+@pytest.mark.parametrize('length', ['invalid', '-1'])
+def test_invalid_content_length_is_rejected(client, length):
+    response = client.post('/api/demo/role', content=b'{}',
+                           headers={'Content-Length': length})
+    assert response.status_code == 400
+
+
+def test_body_at_limit_preserves_normal_role_switch(client):
+    body = b'{"role":"merchant"}'
+    response = client.post('/api/demo/role', content=body.ljust(16000, b' '),
+                           headers={'Content-Type': 'application/json'})
+    assert response.status_code == 200
+    assert response.json()['role'] == 'merchant'
+
+
+def test_non_ascii_csrf_is_denied_without_server_error(client):
+    response = client.post('/api/demo/role', json={'role': 'merchant'},
+                           headers={b'x-csrf-token': b'\xff'})
+    assert response.status_code == 403
+
+
 def test_idempotency_and_stock_race(client):
     lid=shop(client)['listings'][0]['id']; key=secrets.token_hex(16)
     first=order(client,lid,key).json()

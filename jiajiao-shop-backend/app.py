@@ -1,8 +1,6 @@
 """家教小铺 — isolated, persistent sandbox. No real payment gateway is enabled."""
 import hashlib
-import json
 import os
-import re
 import secrets
 import sqlite3
 import threading
@@ -14,6 +12,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 DB_PATH = os.getenv('DATABASE_PATH', str(Path(__file__).parent / 'data' / 'sandbox.sqlite3'))
 FRONTEND = Path(os.getenv('FRONTEND_PATH', str(Path(__file__).parent.parent / 'jiajiao-shop-frontend'))).resolve()
@@ -22,6 +21,7 @@ ALLOWED_HOSTS = set(os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver,j
 if os.getenv('APP_MODE', 'sandbox') != 'sandbox':
     raise RuntimeError('Real-money operation is not implemented. APP_MODE must remain sandbox.')
 app = FastAPI(title='家教小铺 API', version='0.1.0', docs_url=None, redoc_url=None)
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=16000)
 rate_lock = threading.Lock()
 rate_buckets = {}
 
@@ -98,7 +98,7 @@ def session(c, req, roles=None):
     w = c.execute('SELECT * FROM workspaces WHERE token_hash=? AND expires>?', (hashlib.sha256(token.encode()).hexdigest(),int(time.time()))).fetchone()
     if not w: fail(401,'体验已过期，请刷新页面重新开始')
     if roles and w['role'] not in roles: fail(403,'当前身份没有此操作权限')
-    if req.method not in ('GET','HEAD') and not secrets.compare_digest(req.headers.get('x-csrf-token',''), w['csrf']):
+    if req.method not in ('GET','HEAD') and not secrets.compare_digest(req.headers.get('x-csrf-token','').encode(), w['csrf'].encode()):
         fail(403,'请求校验失败，请刷新后重试')
     return w
 
@@ -141,7 +141,13 @@ async def protection(req, call_next):
         origin = req.headers.get('origin')
         if origin and origin != str(req.base_url).rstrip('/'):
             return JSONResponse({'detail':'跨站请求已拒绝'},403)
-        if int(req.headers.get('content-length','0') or 0)>16000:
+        try:
+            length = int(req.headers.get('content-length', '0'))
+            if length < 0:
+                raise ValueError
+        except ValueError:
+            return JSONResponse({'detail':'请求无效'},400)
+        if length > 16000:
             return JSONResponse({'detail':'请求内容过长'},413)
         key = (req.client.host if req.client else 'unknown',req.url.path == '/api/session')
         now = time.time()
